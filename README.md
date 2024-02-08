@@ -1,5 +1,8 @@
 # Netease Discord RPC
 
+**效果图**
+----
+![效果图](https://raw.githubusercontent.com/Cola-Ace/netease_discord_rpc/main/example/example.png)
 
 **说明**
 ----
