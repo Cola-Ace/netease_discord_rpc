@@ -1,0 +1,2 @@
+# netease_discord_rpc
+添加网易云音乐的播放状态到Discord的RPC
