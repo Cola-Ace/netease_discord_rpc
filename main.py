@@ -25,7 +25,7 @@ icon = pystray.Icon("discord_netease_rpc", Image.open(get_resource_path("images/
 import psutil
 import ctypes
 import time
-from pypresence import Presence
+import pypresence
 from ctypes import wintypes
 
 WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -90,10 +90,19 @@ def thread_icon():
 
 def thread_rpc(exit_event):
     client_id = "1205202515180781568"
-    RPC = Presence(client_id)
-    RPC.connect()
+    RPC = pypresence.Presence(client_id)
+
+    is_connect = False
 
     now_playing = ""
+
+    while not is_connect and not exit_event.is_set():
+        try:
+            RPC.connect()
+            print("Connected")
+            is_connect = True
+        except pypresence.exceptions.DiscordNotFound:
+            time.sleep(0.2)
 
     while not exit_event.is_set():
         title = get_netease_title()
@@ -109,8 +118,9 @@ def thread_rpc(exit_event):
         RPC.update(state=f'Author: {author}', details=f'Playing: {name}', large_image="netease", start=int(time.time()))
         time.sleep(0.2)
 
-    RPC.clear()
-    RPC.close()
+    if is_connect:
+        RPC.clear()
+        RPC.close()
 
     icon.stop()
 
