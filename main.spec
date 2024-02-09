@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['main.py', 'netease.py'],
     pathex=[],
     binaries=[],
     datas=[("./images/favicon.ico", "images/")],

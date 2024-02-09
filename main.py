@@ -1,10 +1,18 @@
 import pystray
 import os
 import sys
-from PIL import Image
 import threading
+import time
+import pypresence
+from PIL import Image
+from netease import get_netease_title
 
 exit_event = threading.Event()
+
+is_connect = False
+
+client_id = "1205202515180781568"
+RPC = pypresence.Presence(client_id)
 
 def on_exit(icon, item):
     exit_event.set()
@@ -20,103 +28,62 @@ menu = (pystray.MenuItem("Exit", on_exit),)
 
 icon = pystray.Icon("discord_netease_rpc", Image.open(get_resource_path("images/favicon.ico")), "Netease Music RPC", menu)
 
-# rpc
-
-import psutil
-import ctypes
-import time
-import pypresence
-from ctypes import wintypes
-
-WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-
-user32 = ctypes.windll.user32
-user32.EnumWindows.argtypes = [ WNDENUMPROC, wintypes.LPARAM ]
-user32.GetWindowTextLengthW.argtypes = [ wintypes.HWND ]
-user32.GetWindowTextW.argtypes = [ wintypes.HWND, wintypes.LPWSTR, ctypes.c_int ]
-
-ignore_process_list = ['', 'svchost.exe', 'explorer.exe', 'dwm.exe', 'System Idle Process']
-ignore_title_list = ["''", "'Default IME'", "'MSCTFIME UI'"]
-
-def get_window_text(hwnd):
-    length = user32.GetWindowTextLengthW(hwnd) + 1
-    buffer = ctypes.create_unicode_buffer(length)
-    user32.GetWindowTextW(hwnd, buffer, length)
-    return repr(buffer.value)
-
-def get_all_window_titles():
-    global window_titles
-    window_titles = []
-    cb_worker = WNDENUMPROC(worker)
-    if not user32.EnumWindows(cb_worker, 1):
-        raise ctypes.WinError()
-    return window_titles
-
-def worker(hwnd, lParam):
-    title = get_window_text(hwnd)
-    window_process, pid = get_window_process_name(hwnd)
-    if window_process not in ignore_process_list and title not in ignore_title_list:
-        window_titles.append({
-            'hwnd': hwnd,
-            'title': title[1:-1],
-            'pid': pid,
-            'process': window_process,
-        })
-    return True
-
-def get_window_process_name(hwnd):
-    pid = wintypes.DWORD()
-    ctypes.windll.user32.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
-    try:
-        window_process = psutil.Process(pid.value).name()
-    except psutil.NoSuchProcess:
-        window_process = ''
-    return window_process, pid.value
-
-def get_netease_title():
-    processes = get_all_window_titles()
-    for process in processes:
-        if process["process"] != "cloudmusic.exe" or process["title"].find(" - ") == -1:
-            continue
-        
-        return process["title"]
-    
-    return False
-
 # thread
 
 def thread_icon():
     icon.run()
 
-def thread_rpc(exit_event):
-    client_id = "1205202515180781568"
-    RPC = pypresence.Presence(client_id)
+def thread_connect(exit_event):
+    global is_connect
 
-    is_connect = False
+    print("Connecting...")
 
-    now_playing = ""
+    while not exit_event.is_set():
+        if is_connect:
+            time.sleep(0.2)
+            continue
 
-    while not is_connect and not exit_event.is_set():
         try:
             RPC.connect()
-            print("Connected")
+            time.sleep(0.2)
             is_connect = True
+            print("Connected")
         except pypresence.exceptions.DiscordNotFound:
             time.sleep(0.2)
 
+def thread_rpc(exit_event):
+    global is_connect
+
+    now_playing = ""
+    start_time = 0
+
     while not exit_event.is_set():
+        if not is_connect:
+            time.sleep(0.2)
+            continue
+
         title = get_netease_title()
         if not title or now_playing == title:
             time.sleep(0.2)
             continue
 
         now_playing = title
+        start_time = int(time.time())
 
         # 注: 网易云音乐默认标题为 %作品名% - %作者%
         name = title.split(" - ")[0]
         author = title.split(" - ")[1]
 
-        RPC.update(state=f'Author: {author}', details=f'Playing: {name}', large_image="netease", start=int(time.time()))
+        try:
+            RPC.update(state=f'Author: {author}', details=f'Playing: {name}', large_image="netease", start=start_time)
+        except (pypresence.exceptions.PipeClosed, pypresence.exceptions.ConnectionTimeout) as e:
+            print(f'Error: {e}')
+            print("Disconnected...Trying to reconnect...")
+            RPC.close()
+            is_connect = False
+            start_time = 0
+            now_playing = ""
+
         time.sleep(0.2)
 
     if is_connect:
@@ -128,9 +95,11 @@ def thread_rpc(exit_event):
 
 if __name__ == "__main__":
     thread_a = threading.Thread(target=thread_icon)
-    thread_b = threading.Thread(target=lambda: thread_rpc(exit_event))
+    thread_b = threading.Thread(target=lambda: thread_connect(exit_event))
+    thread_c = threading.Thread(target=lambda: thread_rpc(exit_event))
 
     thread_a.start()
     thread_b.start()
+    thread_c.start()
 
     thread_a.join()
