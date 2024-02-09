@@ -24,7 +24,7 @@
 pip install pystray psutil pypresence
 ```
 
-3.对RPC状态的更新代码行数在109行（代码缝合的很烂，凑合着看）
+3.对RPC状态的更新代码行数在78行（代码缝合的很烂，凑合着看）
 
 4.获取网易云音乐当前播放音乐的功能部分来源于 <https://github.com/Raka-loah/PTEII>
 
