@@ -112,8 +112,9 @@ def thread_rpc(exit_event):
 
         now_playing = title
 
-        author = title.split(" - ")[1]
+        # 注: 网易云音乐默认标题为 %作品名% - %作者%
         name = title.split(" - ")[0]
+        author = title.split(" - ")[1]
 
         RPC.update(state=f'Author: {author}', details=f'Playing: {name}', large_image="netease", start=int(time.time()))
         time.sleep(0.2)
